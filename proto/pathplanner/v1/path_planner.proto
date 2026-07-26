@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package pathplanner.v1;
+
+option go_package = "github.com/rover-fleet/nasa-rover/gen/go/pathplanner/v1;pathplannerv1";
+
+message Position {
+  double latitude  = 1;
+  double longitude = 2;
+  double altitude  = 3;
+}
+
+message Waypoint {
+  Position position       = 1;
+  double   heading        = 2;
+  double   speed_ms       = 3;
+  int64    eta_ms         = 4;
+  bool     is_checkpoint  = 5;
+}
+
+message Obstacle {
+  Position center      = 1;
+  double   radius_m    = 2;
+  string   type        = 3; // "static" | "dynamic" | "unknown"
+  double   confidence  = 4;
+}
+
+message PathRequest {
+  string             rover_id    = 1;
+  Position           current_pos = 2;
+  Position           target_pos  = 3;
+  repeated Obstacle  obstacles   = 4;
+  double             max_speed   = 5;
+  string             algorithm   = 6; // "astar" | "rrt" | "dijkstra"
+}
+
+message PathResponse {
+  string             rover_id      = 1;
+  repeated Waypoint  waypoints     = 2;
+  double             total_dist_m  = 3;
+  int64              eta_ms        = 4;
+  bool               path_found    = 5;
+  string             reason        = 6;
+}
+
+message PositionUpdate {
+  string   rover_id    = 1;
+  Position current_pos = 2;
+  double   heading     = 3;
+  double   velocity    = 4;
+}
+
+message PathAdjustment {
+  string            rover_id  = 1;
+  repeated Waypoint waypoints = 2;
+  bool              rerouted  = 3;
+}
+
+service PathPlanner {
+  // PlanPath computes a full path from current to target position.
+  rpc PlanPath(PathRequest) returns (PathResponse);
+
+  // StreamPath streams waypoints progressively as the rover moves.
+  rpc StreamPath(PathRequest) returns (stream Waypoint);
+
+  // UpdatePosition accepts live position updates and returns path adjustments.
+  rpc UpdatePosition(stream PositionUpdate) returns (stream PathAdjustment);
+}

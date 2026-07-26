@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: obstacle-detector
+  namespace: rover-fleet
+  labels:
+    app: obstacle-detector
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: obstacle-detector
+  template:
+    metadata:
+      labels:
+        app: obstacle-detector
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2112"
+    spec:
+      containers:
+        - name: obstacle-detector
+          image: REGISTRY/rover-obstacle-detector:TAG
+          ports:
+            - containerPort: 50052
+              name: grpc
+            - containerPort: 2112
+              name: metrics
+          env:
+            - name: GRPC_PORT
+              value: "50052"
+            - name: OTEL_SERVICE_NAME
+              value: obstacle-detector
+            - name: KAFKA_BROKERS
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-credentials
+                  key: brokers
+          envFrom:
+            - configMapRef:
+                name: rover-fleet-config
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "128Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          readinessProbe:
+            grpc:
+              port: 50052
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            grpc:
+              port: 50052
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: obstacle-detector
+                topologyKey: kubernetes.io/hostname

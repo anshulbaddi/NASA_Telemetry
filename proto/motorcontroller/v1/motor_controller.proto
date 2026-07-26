@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package motorcontroller.v1;
+
+option go_package = "github.com/rover-fleet/nasa-rover/gen/go/motorcontroller/v1;motorcontrollerv1";
+
+enum MotorFault {
+  MOTOR_FAULT_NONE        = 0;
+  MOTOR_FAULT_OVERTEMP    = 1;
+  MOTOR_FAULT_OVERLOAD    = 2;
+  MOTOR_FAULT_STALL       = 3;
+  MOTOR_FAULT_ENCODER     = 4;
+  MOTOR_FAULT_COMMS       = 5;
+}
+
+message MotorState {
+  double     speed_ms      = 1;
+  double     load          = 2; // 0-1
+  double     temperature   = 3;
+  MotorFault fault         = 4;
+  double     rpm           = 5;
+  double     current_amps  = 6;
+}
+
+message DriveCommand {
+  string rover_id        = 1;
+  double target_speed_ms = 2;  // desired forward speed
+  double turn_rate       = 3;  // -1 (hard left) to +1 (hard right)
+  double duration_ms     = 4;
+  bool   emergency_stop  = 5;
+}
+
+message MotorResponse {
+  string     rover_id      = 1;
+  MotorState left_motor    = 2;
+  MotorState right_motor   = 3;
+  bool       command_acked = 4;
+  string     reason        = 5;
+  int64      timestamp_ms  = 6;
+}
+
+message TelemetryRequest {
+  string rover_id    = 1;
+  int32  interval_ms = 2;
+}
+
+service MotorController {
+  // SendCommand dispatches a drive command to the rover's motor controller.
+  rpc SendCommand(DriveCommand) returns (MotorResponse);
+
+  // StreamTelemetry streams real-time motor state at the requested interval.
+  rpc StreamTelemetry(TelemetryRequest) returns (stream MotorResponse);
+
+  // EmergencyStop immediately halts all motors on the specified rover.
+  rpc EmergencyStop(DriveCommand) returns (MotorResponse);
+}

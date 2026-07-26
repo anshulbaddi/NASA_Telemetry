@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: path-planner
+  namespace: rover-fleet
+  labels:
+    app: path-planner
+spec:
+  selector:
+    app: path-planner
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 50051
+      protocol: TCP
+    - name: metrics
+      port: 2112
+      targetPort: 2112
+      protocol: TCP
+  type: ClusterIP

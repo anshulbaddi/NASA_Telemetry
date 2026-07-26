@@ -1,0 +1,251 @@
+version: "3.9"
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-py-env: &py-env
+  KAFKA_BROKERS: kafka:9092
+  PATH_PLANNER_ADDR: path-planner:50054
+  OBSTACLE_DETECTOR_ADDR: obstacle-detector:50051
+  MOTOR_CONTROLLER_ADDR: motor-controller:50052
+  FDIR_ADDR: fdir:50053
+  OTLP_ENDPOINT: http://jaeger:4317
+  LOG_LEVEL: INFO
+
+services:
+  # ── Infrastructure ────────────────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports: ["2181:2181"]
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 16
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: kafka
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      "
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 16 --replication-factor 1 --topic rover.telemetry
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 16 --replication-factor 1 --topic rover.commands
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --partitions 8  --replication-factor 1 --topic rover.fdir.events
+      echo 'Topics created.'
+      "
+
+  # ── Observability ─────────────────────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.59
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+      SPAN_STORAGE_TYPE: memory
+    logging: *default-logging
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    ports: ["9090:9090"]
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+      - "--storage.tsdb.retention.time=7d"
+    logging: *default-logging
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    ports: ["3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: rover123
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on: [prometheus, jaeger]
+    logging: *default-logging
+
+  # ── Python gRPC Microservices ─────────────────────────────────────────────
+  obstacle-detector:
+    build:
+      context: .
+      dockerfile: services/obstacle-detector/Dockerfile
+    environment:
+      <<: *py-env
+      GRPC_PORT: "50051"
+      METRICS_PORT: "9093"
+    ports: ["50051:50051", "9093:9093"]
+    depends_on:
+      jaeger:
+        condition: service_started
+    logging: *default-logging
+    restart: unless-stopped
+
+  motor-controller:
+    build:
+      context: .
+      dockerfile: services/motor-controller/Dockerfile
+    environment:
+      <<: *py-env
+      GRPC_PORT: "50052"
+      METRICS_PORT: "9094"
+    ports: ["50052:50052", "9094:9094"]
+    depends_on:
+      jaeger:
+        condition: service_started
+    logging: *default-logging
+    restart: unless-stopped
+
+  fdir:
+    build:
+      context: .
+      dockerfile: services/fdir/Dockerfile
+    environment:
+      <<: *py-env
+      GRPC_PORT: "50053"
+      METRICS_PORT: "2112"
+      ANOMALY_CONTAMINATION: "0.05"
+    ports: ["50053:50053", "2112:2112"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    logging: *default-logging
+    restart: unless-stopped
+
+  path-planner:
+    build:
+      context: .
+      dockerfile: services/path-planner/Dockerfile
+    environment:
+      <<: *py-env
+      GRPC_PORT: "50054"
+      METRICS_PORT: "9092"
+    ports: ["50054:50054", "9092:9092"]
+    depends_on:
+      jaeger:
+        condition: service_started
+    logging: *default-logging
+    restart: unless-stopped
+
+  # ── Kafka Services ────────────────────────────────────────────────────────
+  producer:
+    build:
+      context: .
+      dockerfile: services/producer/Dockerfile
+    environment:
+      <<: *py-env
+      METRICS_PORT: "9090"
+      NUM_ROVERS: "50"
+      PUBLISH_RATE_HZ: "200"
+    ports: ["9095:9090"]
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      jaeger:
+        condition: service_started
+    logging: *default-logging
+    restart: unless-stopped
+
+  consumer:
+    build:
+      context: .
+      dockerfile: services/consumer/Dockerfile
+    environment:
+      <<: *py-env
+      METRICS_PORT: "9091"
+      KAFKA_GROUP: rover-consumer-group
+      CONSUMER_CONCURRENCY: "32"
+    ports: ["9096:9091"]
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      obstacle-detector:
+        condition: service_started
+      motor-controller:
+        condition: service_started
+      fdir:
+        condition: service_started
+    deploy:
+      replicas: 3
+    logging: *default-logging
+    restart: unless-stopped
+
+  # ── API Gateway ───────────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    environment:
+      <<: *py-env
+      HTTP_PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      path-planner:
+        condition: service_started
+      fdir:
+        condition: service_started
+      motor-controller:
+        condition: service_started
+    logging: *default-logging
+    restart: unless-stopped
+
+  # ── Kafka UI (dev only) ───────────────────────────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    ports: ["8090:8080"]
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    logging: *default-logging

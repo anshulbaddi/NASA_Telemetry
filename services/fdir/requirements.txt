@@ -1,0 +1,12 @@
+confluent-kafka==2.5.0
+scikit-learn==1.5.1
+numpy==2.0.1
+Cython>=3.0
+betterproto==1.2.5
+grpclib==0.4.7
+opentelemetry-api==1.22.0
+opentelemetry-sdk==1.22.0
+opentelemetry-exporter-otlp-proto-grpc==1.22.0
+grpcio==1.60.0
+prometheus-client==0.20.0
+structlog==24.4.0

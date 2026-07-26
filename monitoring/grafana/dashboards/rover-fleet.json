@@ -1,0 +1,202 @@
+{
+  "title": "Rover Fleet — Ground Control",
+  "uid": "rover-fleet-main",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-30m", "to": "now" },
+  "tags": ["rover-fleet", "telemetry", "fdir"],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Kafka Throughput (msg/sec)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "targets": [{
+        "expr": "sum(rate(kafka_messages_produced_total[1m]))",
+        "legendFormat": "msg/sec"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "thresholds": {
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 50000 },
+            { "color": "red", "value": 160000 }
+          ]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Active Rover Count",
+      "type": "stat",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "targets": [{
+        "expr": "count(count by (rover_id)(rover_battery_percent))",
+        "legendFormat": "Rovers"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "thresholds": {
+          "steps": [{ "color": "blue", "value": null }]
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Active Faults",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "targets": [{
+        "expr": "sum(fdir_active_faults)",
+        "legendFormat": "Active Faults"
+      }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "thresholds": {
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 1 },
+            { "color": "red", "value": 5 }
+          ]
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "FDIR Anomaly Detection Latency (p99)",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "targets": [{
+        "expr": "histogram_quantile(0.99, sum(rate(fdir_detection_latency_seconds_bucket[5m])) by (le))",
+        "legendFormat": "p99 latency"
+      }],
+      "options": {
+        "unit": "s",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "thresholds": {
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 10 },
+            { "color": "red", "value": 30 }
+          ]
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "gRPC Request Latency by Service (p99)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(grpc_request_duration_seconds_bucket[1m])) by (method, le))",
+          "legendFormat": "{{method}} p99"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(grpc_request_duration_seconds_bucket[1m])) by (method, le))",
+          "legendFormat": "{{method}} p50"
+        }
+      ],
+      "options": {
+        "unit": "s",
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Kafka Consumer Lag",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum(kafka_consumer_lag) by (topic)",
+        "legendFormat": "{{topic}}"
+      }],
+      "options": {
+        "unit": "short",
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Rover Battery Levels",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "rover_battery_percent",
+        "legendFormat": "{{rover_id}}"
+      }],
+      "options": {
+        "unit": "percent",
+        "thresholds": {
+          "steps": [
+            { "color": "red", "value": null },
+            { "color": "yellow", "value": 20 },
+            { "color": "green", "value": 50 }
+          ]
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Motor Temperature by Rover",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "rover_motor_temp_celsius",
+        "legendFormat": "{{rover_id}} {{motor}}"
+      }],
+      "options": {
+        "unit": "celsius",
+        "thresholds": {
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 80 },
+            { "color": "red", "value": 100 }
+          ]
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "FDIR Anomalies Detected (rate/min)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum(rate(fdir_anomalies_detected_total[1m])) by (severity) * 60",
+        "legendFormat": "{{severity}}"
+      }],
+      "options": { "unit": "short" }
+    },
+    {
+      "id": 10,
+      "title": "Obstacles Detected per Rover",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum(rate(obstacles_detected_total[1m])) by (rover_id, classification) * 60",
+        "legendFormat": "{{rover_id}} {{classification}}"
+      }],
+      "options": { "unit": "short" }
+    },
+    {
+      "id": 11,
+      "title": "Telemetry Messages Processed (all services)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 28, "w": 24, "h": 6 },
+      "targets": [{
+        "expr": "sum(rate(telemetry_messages_total[30s])) by (service) * 30",
+        "legendFormat": "{{service}}"
+      }],
+      "options": {
+        "unit": "short",
+        "tooltip": { "mode": "multi" }
+      }
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fdir
+  namespace: rover-fleet
+  labels:
+    app: fdir
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fdir
+  template:
+    metadata:
+      labels:
+        app: fdir
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2112"
+    spec:
+      containers:
+        - name: fdir
+          image: REGISTRY/rover-fdir:TAG
+          ports:
+            - containerPort: 2112
+              name: metrics
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: fdir
+            - name: KAFKA_BROKERS
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-credentials
+                  key: brokers
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://jaeger-collector.rover-fleet:4317"
+          envFrom:
+            - configMapRef:
+                name: rover-fleet-config
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"  # Isolation Forest model can use significant memory
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 2112
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 2112
+            initialDelaySeconds: 30
+            periodSeconds: 30

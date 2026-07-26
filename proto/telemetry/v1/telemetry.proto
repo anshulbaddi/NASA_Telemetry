@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package telemetry.v1;
+
+option go_package = "github.com/rover-fleet/nasa-rover/gen/go/telemetry/v1;telemetryv1";
+
+// RoverStatus represents the operational state of a rover.
+enum RoverStatus {
+  ROVER_STATUS_UNSPECIFIED = 0;
+  ROVER_STATUS_NOMINAL     = 1;
+  ROVER_STATUS_WARNING     = 2;
+  ROVER_STATUS_CRITICAL    = 3;
+  ROVER_STATUS_FAULT       = 4;
+  ROVER_STATUS_RECOVERED   = 5;
+}
+
+// SensorData is a single telemetry frame from one rover, streamed every ~16ms.
+message SensorData {
+  string      rover_id              = 1;
+  int64       timestamp_ms          = 2;  // Unix ms
+  double      latitude              = 3;
+  double      longitude             = 4;
+  double      altitude_m            = 5;
+  double      battery_percent       = 6;
+  double      cpu_temp_celsius      = 7;
+  double      motor_temp_celsius    = 8;
+  double      motor_load_left       = 9;   // 0-1 normalized
+  double      motor_load_right      = 10;
+  repeated double obstacle_distances_m = 11; // LIDAR ring (360 rays)
+  double      velocity_ms           = 12;
+  double      heading_degrees       = 13;
+  RoverStatus status                = 14;
+  string      error_code            = 15;
+  int64       sequence_number       = 16;
+}
+
+// TelemetryBatch allows bulk ingestion for replay/backfill scenarios.
+message TelemetryBatch {
+  repeated SensorData readings = 1;
+  string               source  = 2;
+}

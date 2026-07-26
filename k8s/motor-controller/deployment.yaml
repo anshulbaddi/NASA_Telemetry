@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: motor-controller
+  namespace: rover-fleet
+  labels:
+    app: motor-controller
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: motor-controller
+  template:
+    metadata:
+      labels:
+        app: motor-controller
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2112"
+    spec:
+      containers:
+        - name: motor-controller
+          image: REGISTRY/rover-motor-controller:TAG
+          ports:
+            - containerPort: 50053
+              name: grpc
+            - containerPort: 2112
+              name: metrics
+          env:
+            - name: GRPC_PORT
+              value: "50053"
+            - name: OTEL_SERVICE_NAME
+              value: motor-controller
+            - name: KAFKA_BROKERS
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-credentials
+                  key: brokers
+          envFrom:
+            - configMapRef:
+                name: rover-fleet-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            grpc:
+              port: 50053
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            grpc:
+              port: 50053
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false

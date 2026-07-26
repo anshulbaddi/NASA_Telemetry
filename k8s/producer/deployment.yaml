@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer
+  namespace: rover-fleet
+  labels:
+    app: producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2112"
+    spec:
+      containers:
+        - name: producer
+          image: REGISTRY/rover-producer:TAG
+          ports:
+            - containerPort: 2112
+              name: metrics
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: producer
+            - name: KAFKA_BROKERS
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-credentials
+                  key: brokers
+          envFrom:
+            - configMapRef:
+                name: rover-fleet-config
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+            limits:
+              cpu: "2000m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 2112
+            initialDelaySeconds: 5
+            periodSeconds: 10

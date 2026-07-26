@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# Cython build artifacts
+*.c
+*.cpp
+services/fdir/fdir_native.cpp
+services/fdir/fdir_native.c
+*.so
+*.pyd
+
+# Terraform
+infrastructure/terraform/.terraform/
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.backup
+infrastructure/terraform/*.tfplan
+infrastructure/terraform/tfplan
+infrastructure/terraform/.terraform.lock.hcl
+
+# Environment / secrets
+.env
+*.env
+*.pem
+*.key
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Kafka / Docker volumes
+data/
+logs/

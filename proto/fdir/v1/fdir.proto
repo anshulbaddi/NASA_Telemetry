@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package fdir.v1;
+
+option go_package = "github.com/rover-fleet/nasa-rover/gen/go/fdir/v1;fdirv1";
+
+// FaultSeverity mirrors NASA FDIR severity levels.
+enum FaultSeverity {
+  FAULT_SEVERITY_UNSPECIFIED = 0;
+  FAULT_SEVERITY_ADVISORY    = 1; // Informational — no action required
+  FAULT_SEVERITY_CAUTION     = 2; // Anomaly — monitor closely
+  FAULT_SEVERITY_WARNING     = 3; // Degraded — limit ops
+  FAULT_SEVERITY_CRITICAL    = 4; // Safing required
+  FAULT_SEVERITY_EMERGENCY   = 5; // Immediate abort
+}
+
+enum RecoveryAction {
+  RECOVERY_ACTION_NONE           = 0;
+  RECOVERY_ACTION_MONITOR        = 1;
+  RECOVERY_ACTION_REDUCE_SPEED   = 2;
+  RECOVERY_ACTION_PAUSE          = 3;
+  RECOVERY_ACTION_RETURN_TO_BASE = 4;
+  RECOVERY_ACTION_SAFE_MODE      = 5;
+  RECOVERY_ACTION_ABORT          = 6;
+}
+
+message AnomalyFeatures {
+  double battery_percent     = 1;
+  double cpu_temp_celsius    = 2;
+  double motor_temp_celsius  = 3;
+  double motor_load_left     = 4;
+  double motor_load_right    = 5;
+  double velocity_ms         = 6;
+  double obstacle_density    = 7; // derived from LIDAR
+}
+
+message FaultEvent {
+  string          rover_id          = 1;
+  int64           detected_at_ms    = 2;
+  FaultSeverity   severity          = 3;
+  string          fault_code        = 4;
+  string          description       = 5;
+  AnomalyFeatures anomaly_features  = 6;
+  double          anomaly_score     = 7;  // Isolation Forest score
+  RecoveryAction  recommended_action = 8;
+}
+
+message RecoveryCommand {
+  string         rover_id      = 1;
+  RecoveryAction action        = 2;
+  string         reason        = 3;
+  int64          issued_at_ms  = 4;
+  bool           acknowledged  = 5;
+}
+
+message FDIRStatusRequest {
+  string rover_id = 1;
+}
+
+message FDIRStatus {
+  string          rover_id          = 1;
+  FaultSeverity   current_severity  = 2;
+  repeated string active_faults     = 3;
+  int64           last_fault_ms     = 4;
+  int64           last_recovery_ms  = 5;
+  int64           total_anomalies   = 6;
+  double          anomaly_rate_per_min = 7;
+}
+
+service FDIRService {
+  // GetStatus returns the current FDIR status for a rover.
+  rpc GetStatus(FDIRStatusRequest) returns (FDIRStatus);
+
+  // StreamFaults streams fault events as they are detected.
+  rpc StreamFaults(FDIRStatusRequest) returns (stream FaultEvent);
+
+  // IssueRecovery allows external override of recovery commands.
+  rpc IssueRecovery(RecoveryCommand) returns (RecoveryCommand);
+}

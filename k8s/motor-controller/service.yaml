@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: motor-controller
+  namespace: rover-fleet
+spec:
+  selector:
+    app: motor-controller
+  ports:
+    - name: grpc
+      port: 50053
+      targetPort: 50053
+    - name: metrics
+      port: 2112
+      targetPort: 2112
+  type: ClusterIP

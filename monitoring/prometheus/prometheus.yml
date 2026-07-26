@@ -1,0 +1,74 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: rover-fleet
+    env: production
+
+# Alertmanager config (wire up PagerDuty in production)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  # ── Rover microservices ─────────────────────────────────────────────────────
+  - job_name: producer
+    static_configs:
+      - targets: ["producer:2112"]
+    metrics_path: /metrics
+
+  - job_name: consumer
+    static_configs:
+      - targets: ["consumer:2112"]
+    metrics_path: /metrics
+
+  - job_name: path-planner
+    static_configs:
+      - targets: ["path-planner:2112"]
+    metrics_path: /metrics
+
+  - job_name: obstacle-detector
+    static_configs:
+      - targets: ["obstacle-detector:2112"]
+    metrics_path: /metrics
+
+  - job_name: motor-controller
+    static_configs:
+      - targets: ["motor-controller:2112"]
+    metrics_path: /metrics
+
+  - job_name: fdir
+    static_configs:
+      - targets: ["fdir:2112"]
+    metrics_path: /metrics
+
+  - job_name: api-gateway
+    static_configs:
+      - targets: ["api-gateway:2112"]
+    metrics_path: /metrics
+
+  # ── Kafka (JMX via Prometheus JMX exporter) ─────────────────────────────────
+  - job_name: kafka
+    static_configs:
+      - targets: ["kafka:9101"]
+    metrics_path: /metrics
+
+  # ── Kubernetes node discovery (production) ───────────────────────────────────
+  # - job_name: kubernetes-pods
+  #   kubernetes_sd_configs:
+  #     - role: pod
+  #   relabel_configs:
+  #     - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+  #       action: keep
+  #       regex: true
+  #     - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+  #       action: replace
+  #       target_label: __address__
+  #       regex: (.+)
+  #       replacement: $1:${__meta_kubernetes_pod_annotation_prometheus_io_port}
+
+  # ── Self-monitoring ─────────────────────────────────────────────────────────
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

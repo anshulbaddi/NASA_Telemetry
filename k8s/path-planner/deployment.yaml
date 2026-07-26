@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: path-planner
+  namespace: rover-fleet
+  labels:
+    app: path-planner
+    version: "1.0"
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: path-planner
+  template:
+    metadata:
+      labels:
+        app: path-planner
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2112"
+        prometheus.io/path: "/metrics"
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: path-planner
+      containers:
+        - name: path-planner
+          image: REGISTRY/rover-path-planner:TAG
+          ports:
+            - containerPort: 50051
+              name: grpc
+            - containerPort: 2112
+              name: metrics
+          env:
+            - name: GRPC_PORT
+              value: "50051"
+            - name: OTEL_SERVICE_NAME
+              value: path-planner
+            - name: KAFKA_BROKERS
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-credentials
+                  key: brokers
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: rover-fleet-config
+                  key: OTEL_SERVICE_VERSION
+          envFrom:
+            - configMapRef:
+                name: rover-fleet-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            grpc:
+              port: 50051
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            grpc:
+              port: 50051
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: path-planner
+                topologyKey: kubernetes.io/hostname

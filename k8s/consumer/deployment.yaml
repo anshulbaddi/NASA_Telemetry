@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consumer
+  namespace: rover-fleet
+  labels:
+    app: consumer
+spec:
+  replicas: 3  # Must match or be multiple of Kafka partition count for full parallelism
+  selector:
+    matchLabels:
+      app: consumer
+  template:
+    metadata:
+      labels:
+        app: consumer
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2112"
+    spec:
+      containers:
+        - name: consumer
+          image: REGISTRY/rover-consumer:TAG
+          ports:
+            - containerPort: 2112
+              name: metrics
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: consumer
+            - name: KAFKA_BROKERS
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-credentials
+                  key: brokers
+            - name: OBSTACLE_DETECTOR_ADDR
+              value: "obstacle-detector.rover-fleet:50052"
+            - name: MOTOR_CONTROLLER_ADDR
+              value: "motor-controller.rover-fleet:50053"
+          envFrom:
+            - configMapRef:
+                name: rover-fleet-config
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 2112
+            initialDelaySeconds: 10
+            periodSeconds: 10

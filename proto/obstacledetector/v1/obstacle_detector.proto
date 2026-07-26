@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package obstacledetector.v1;
+
+option go_package = "github.com/rover-fleet/nasa-rover/gen/go/obstacledetector/v1;obstacledetectorv1";
+
+message SensorInput {
+  string          rover_id             = 1;
+  int64           timestamp_ms         = 2;
+  repeated double lidar_distances_m    = 3; // LIDAR ring readings
+  double          velocity_ms          = 4;
+  double          heading_degrees      = 5;
+}
+
+message DetectedObstacle {
+  double bearing_degrees  = 1;
+  double distance_m       = 2;
+  double width_estimate_m = 3;
+  string classification   = 4; // "rock" | "terrain" | "moving" | "unknown"
+  double threat_level     = 5; // 0.0-1.0
+}
+
+message ClearZone {
+  double bearing_start = 1;
+  double bearing_end   = 2;
+  double max_safe_dist = 3;
+}
+
+message ObstacleAnalysis {
+  string                    rover_id            = 1;
+  int64                     timestamp_ms        = 2;
+  repeated DetectedObstacle obstacles           = 3;
+  repeated ClearZone        clear_zones         = 4;
+  bool                      emergency_stop      = 5;
+  string                    recommended_action  = 6;
+  double                    processing_time_ms  = 7;
+}
+
+service ObstacleDetector {
+  // Analyze processes a single sensor frame and returns obstacle analysis.
+  rpc Analyze(SensorInput) returns (ObstacleAnalysis);
+
+  // StreamAnalysis processes a continuous sensor stream for real-time avoidance.
+  rpc StreamAnalysis(stream SensorInput) returns (stream ObstacleAnalysis);
+}
