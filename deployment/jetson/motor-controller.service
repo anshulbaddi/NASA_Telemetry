@@ -1,0 +1,33 @@
+[Unit]
+Description=Rover Motor Controller gRPC Service
+Documentation=https://github.com/anshulbaddi/NASA_Telemetry
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jetson
+Group=jetson
+WorkingDirectory=/home/jetson/rover
+
+EnvironmentFile=/home/jetson/rover/.env.rover
+
+ExecStart=/home/jetson/rover/venv/bin/python3 /home/jetson/rover/services/motor-controller/main.py
+
+Restart=on-failure
+RestartSec=3s
+StartLimitInterval=60s
+StartLimitBurst=5
+
+TimeoutStartSec=15s
+TimeoutStopSec=8s
+
+# GPIO access requires the gpio group on Jetson
+SupplementaryGroups=gpio
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=motor-controller
+
+[Install]
+WantedBy=multi-user.target

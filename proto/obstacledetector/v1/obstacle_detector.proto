@@ -7,9 +7,14 @@ option go_package = "github.com/rover-fleet/nasa-rover/gen/go/obstacledetector/v
 message SensorInput {
   string          rover_id             = 1;
   int64           timestamp_ms         = 2;
-  repeated double lidar_distances_m    = 3; // LIDAR ring readings
+  repeated double lidar_distances_m    = 3; // LIDAR ring readings (simulation)
   double          velocity_ms          = 4;
   double          heading_degrees      = 5;
+  // Stereo-derived regional clearances (physical rover, PERCEPTION_MODE=stereo)
+  double          left_clearance_m     = 6;
+  double          center_clearance_m   = 7;
+  double          right_clearance_m    = 8;
+  bool            stereo_input         = 9; // true when depth comes from stereo camera
 }
 
 message DetectedObstacle {

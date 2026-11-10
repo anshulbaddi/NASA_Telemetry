@@ -1,0 +1,101 @@
+# ── Rover system configuration ─────────────────────────────────────────────────
+#
+# These values supplement environment variables.  Environment variables take
+# precedence when both are set (the stereo-perception service reads from
+# environment only; this file is provided for documentation and reference).
+#
+# Copy relevant values into your .env or deployment script.
+# ──────────────────────────────────────────────────────────────────────────────
+
+rover:
+  id: "PHYSICAL-ROVER-001"
+
+camera:
+  type: "usb"          # csi | usb | file
+  left_id: 0
+  right_id: 1
+  width: 640
+  height: 480
+  fps: 30
+  calibration_file: "config/stereo_calibration.yaml"
+  require_calibration: false  # set true in production
+
+stereo:
+  algorithm: "sgbm"     # sgbm (better) | bm (faster)
+  min_disparity: 0
+  num_disparities: 64   # must be divisible by 16
+  block_size: 7         # must be odd
+  uniqueness_ratio: 10
+  speckle_window_size: 100
+  speckle_range: 32
+  p1_mult: 8
+  p2_mult: 32
+  use_wls_filter: false
+  use_gpu: false
+
+depth:
+  min_depth_m: 0.25
+  max_depth_m: 10.0
+
+obstacle:
+  left_region_frac: 0.33
+  center_region_frac: 0.34
+  obstacle_percentile: 10.0
+  depth_roi_top_frac: 0.25
+  depth_roi_bottom_frac: 0.75
+
+safety:
+  emergency_distance_m: 0.5
+  stop_distance_m: 1.5
+  warning_distance_m: 3.0
+  vision_timeout_s: 1.0
+
+motor:
+  backend: "simulated"   # simulated | gpio | serial
+  max_speed_ms: 1.0
+  turn_speed_ms: 0.3
+  turn_rate: 0.6
+  controller_addr: "localhost:50052"
+  # GPIO pin config (Jetson BOARD numbering)
+  gpio:
+    left_pwm_pin: 33
+    left_dir1_pin: 35
+    left_dir2_pin: 37
+    right_pwm_pin: 32
+    right_dir1_pin: 36
+    right_dir2_pin: 38
+    pwm_freq_hz: 1000
+  # Serial config
+  serial:
+    port: "/dev/ttyUSB0"
+    baud: 9600
+
+telemetry:
+  mode: "simulation"   # simulation | hardware
+  rate_hz: 5.0
+  kafka_topic: "rover.telemetry"
+
+ground_station:
+  host: "192.168.1.100"   # replace with actual ground station IP
+  kafka_port: 9092
+  prometheus_port: 9090
+  jaeger_port: 4317
+
+jetson:
+  metrics_port: 9095     # Prometheus will scrape this port
+  log_level: "INFO"
+  debug_viz: false       # show OpenCV windows (requires display)
+  debug_save: false      # save rectified/depth frames to disk
+  debug_dir: "debug_output"
+  debug_every_n_frames: 30
+
+network:
+  # Ports that must be open between Jetson and ground station
+  # Jetson → Ground Station:
+  #   TCP 9092  Kafka (telemetry publishing)
+  #   TCP 4317  Jaeger OTLP (tracing)
+  # Ground Station → Jetson:
+  #   TCP 9095  Prometheus scrape (metrics)
+  #   TCP 50052 Motor controller gRPC (remote estop from API gateway)
+  kafka_bootstrap: "192.168.1.100:9092"
+  otlp_endpoint: "http://192.168.1.100:4317"

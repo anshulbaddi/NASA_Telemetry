@@ -1,0 +1,50 @@
+# ── OAK-D Lite (Luxonis DepthAI) ─────────────────────────────────────────────
+# Required when CAMERA_TYPE=oak.  Install before opencv when using OAK-D Lite.
+# DepthAI ships its own USB3 runtime — no system-level libusb setup needed.
+depthai>=2.24.0
+
+# ── Core perception ──────────────────────────────────────────────────────────
+# Install OpenCV with GStreamer support for CSI cameras on Jetson:
+#   sudo apt-get install python3-opencv
+# Or use the Jetson-specific wheel:
+#   pip install https://github.com/Qengineering/OpenCV-4-5-5-Jetson-Nano/releases/...
+# The plain PyPI wheel below works for USB and file camera modes.
+opencv-python>=4.8.0
+
+# ── numpy — stay below 2.x for Jetson Python 3.8/3.9 compatibility ───────────
+numpy>=1.24,<2.0
+
+# ── YAML (calibration files) ─────────────────────────────────────────────────
+PyYAML>=6.0
+
+# ── Kafka telemetry publisher ─────────────────────────────────────────────────
+confluent-kafka==2.3.0
+
+# ── gRPC (motor controller client) ────────────────────────────────────────────
+betterproto==1.2.5
+grpclib==0.4.7
+grpcio==1.60.0
+
+# ── Observability ─────────────────────────────────────────────────────────────
+prometheus-client==0.19.0
+opentelemetry-api==1.22.0
+opentelemetry-sdk==1.22.0
+opentelemetry-exporter-otlp-proto-grpc==1.22.0
+
+# ── System metrics ────────────────────────────────────────────────────────────
+psutil>=5.9
+
+# ── Optional: WLS filter (requires opencv-contrib) ────────────────────────────
+# Only install if USE_WLS_FILTER=true.  Not available in plain opencv-python.
+# opencv-contrib-python>=4.8.0
+
+# ── Note for Jetson Nano ──────────────────────────────────────────────────────
+# Do NOT install tensorflow, pytorch, or other heavy ML frameworks in this
+# environment unless you specifically need them.  The Jetson Nano has 4 GB RAM
+# shared between CPU and GPU; the perception pipeline must stay lean.
+#
+# For GPIO motor backend, install Jetson.GPIO:
+#   sudo pip3 install Jetson.GPIO
+#
+# For serial motor backend:
+#   pip3 install pyserial

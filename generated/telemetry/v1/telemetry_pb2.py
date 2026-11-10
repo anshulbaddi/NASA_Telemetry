@@ -32,6 +32,22 @@ class SensorData(betterproto.Message):
     status:               RoverStatus = betterproto.enum_field(14)
     error_code:           str         = betterproto.string_field(15)
     sequence_number:      int         = betterproto.int64_field(16)
+    # Physical rover / stereo-perception fields (zero when simulated)
+    nearest_obstacle_m:   float       = betterproto.double_field(17)
+    left_clearance_m:     float       = betterproto.double_field(18)
+    center_clearance_m:   float       = betterproto.double_field(19)
+    right_clearance_m:    float       = betterproto.double_field(20)
+    obstacle_detected:    bool        = betterproto.bool_field(21)
+    commanded_direction:  str         = betterproto.string_field(22)
+    camera_status:        str         = betterproto.string_field(23)
+    depth_fps:            float       = betterproto.double_field(24)
+    camera_fps:           float       = betterproto.double_field(25)
+    gpu_usage_percent:    float       = betterproto.double_field(26)
+    memory_usage_percent: float       = betterproto.double_field(27)
+    gpu_temp_celsius:     float       = betterproto.double_field(28)
+    planner_state:        str         = betterproto.string_field(29)
+    depth_latency_ms:     float       = betterproto.double_field(30)
+    valid_depth_fraction: float       = betterproto.double_field(31)
 
 
 @dataclass

@@ -32,6 +32,23 @@ message SensorData {
   RoverStatus status                = 14;
   string      error_code            = 15;
   int64       sequence_number       = 16;
+
+  // ── Physical rover / stereo-perception fields (optional; zero when simulated) ─
+  double      nearest_obstacle_m   = 17;  // closest obstacle from stereo depth
+  double      left_clearance_m     = 18;  // robust depth in left image region
+  double      center_clearance_m   = 19;  // robust depth in center image region
+  double      right_clearance_m    = 20;  // robust depth in right image region
+  bool        obstacle_detected    = 21;
+  string      commanded_direction  = 22;  // FORWARD|TURN_LEFT|TURN_RIGHT|STOP|EMERGENCY_STOP
+  string      camera_status        = 23;  // OK|LEFT_FAIL|RIGHT_FAIL|BOTH_FAIL
+  double      depth_fps            = 24;  // stereo depth pipeline FPS
+  double      camera_fps           = 25;  // camera capture FPS
+  double      gpu_usage_percent    = 26;  // Jetson GPU utilisation
+  double      memory_usage_percent = 27;  // system RAM utilisation
+  double      gpu_temp_celsius     = 28;  // Jetson GPU temperature
+  string      planner_state        = 29;  // NOMINAL|OBSTACLE_AVOIDANCE|STOPPED|FAULT
+  double      depth_latency_ms     = 30;  // end-to-end perception latency
+  double      valid_depth_fraction = 31;  // fraction of pixels with valid depth (0-1)
 }
 
 // TelemetryBatch allows bulk ingestion for replay/backfill scenarios.

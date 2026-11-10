@@ -34,6 +34,10 @@ EMERGENCY_DIST_M  = float(os.getenv("EMERGENCY_DIST_M",  "1.5"))   # stop if any
 THREAT_DIST_M     = float(os.getenv("THREAT_DIST_M",     "3.0"))   # high-threat threshold
 CLUSTER_GAP_DEG   = float(os.getenv("CLUSTER_GAP_DEG",   "15.0"))  # angular gap between clusters
 
+# PERCEPTION_MODE=simulation — use incoming lidar_distances_m (existing path)
+# PERCEPTION_MODE=stereo     — use left/center/right clearances from stereo camera
+PERCEPTION_MODE   = os.getenv("PERCEPTION_MODE", "simulation")  # simulation | stereo
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
@@ -184,6 +188,66 @@ def _recommend(obstacles: List[DetectedObstacle], clear_zones: List[ClearZone]) 
     return "SLOW_AND_ASSESS"
 
 
+# ── Stereo-derived obstacle analysis ─────────────────────────────────────────
+
+def _analyze_stereo(sensor_input: SensorInput) -> ObstacleAnalysis:
+    """
+    Produce an ObstacleAnalysis from stereo regional clearances.
+
+    Called when sensor_input.stereo_input == True.  The three clearance
+    distances (left/center/right) replace the 72-ray LIDAR ring.
+
+    We map the regional depths to synthetic DetectedObstacle entries so
+    the rest of the pipeline (path planner, FDIR, API gateway) can consume
+    the same protobuf messages without modification.
+    """
+    left_m   = sensor_input.left_clearance_m   or 999.0
+    center_m = sensor_input.center_clearance_m or 999.0
+    right_m  = sensor_input.right_clearance_m  or 999.0
+
+    velocity_ms = sensor_input.velocity_ms or 0.0
+    obstacles: List[DetectedObstacle] = []
+    clear_zones: List[ClearZone]      = []
+
+    region_map = [
+        ("left",   left_m,   315.0),   # bearing ≈ 315° (front-left)
+        ("center", center_m,   0.0),   # bearing ≈ 0°   (straight ahead)
+        ("right",  right_m,   45.0),   # bearing ≈ 45°  (front-right)
+    ]
+
+    for name, dist_m, bearing in region_map:
+        if dist_m < 999.0 and dist_m > 0:
+            threat = _threat_score(dist_m, velocity_ms)
+            cls    = _classify(dist_m, velocity_ms)
+            if dist_m < THREAT_DIST_M:
+                obstacles.append(DetectedObstacle(
+                    bearing_degrees  = bearing,
+                    distance_m       = dist_m,
+                    width_estimate_m = 0.5,
+                    classification   = cls,
+                    threat_level     = threat,
+                ))
+            else:
+                clear_zones.append(ClearZone(
+                    bearing_start = bearing - 20.0,
+                    bearing_end   = bearing + 20.0,
+                    max_safe_dist = min(dist_m, 20.0),
+                ))
+
+    e_stop = any(o.distance_m < EMERGENCY_DIST_M for o in obstacles)
+    action = _recommend(obstacles, clear_zones)
+
+    return ObstacleAnalysis(
+        rover_id           = sensor_input.rover_id,
+        timestamp_ms       = sensor_input.timestamp_ms,
+        obstacles          = obstacles,
+        clear_zones        = clear_zones,
+        emergency_stop     = e_stop,
+        recommended_action = action,
+        processing_time_ms = 0.0,
+    )
+
+
 # ── gRPC service implementation ───────────────────────────────────────────────
 _tracer: trace.Tracer
 
@@ -192,27 +256,38 @@ class ObstacleDetectorService(ObstacleDetectorBase):
 
     async def analyze(self, sensor_input: SensorInput) -> ObstacleAnalysis:
         with _tracer.start_as_current_span("obstacle.analyze") as span:
-            span.set_attribute("rover.id",    sensor_input.rover_id)
-            span.set_attribute("lidar.rays",  len(sensor_input.lidar_distances_m))
-            span.set_attribute("velocity.ms", sensor_input.velocity_ms)
+            span.set_attribute("rover.id",         sensor_input.rover_id)
+            span.set_attribute("velocity.ms",      sensor_input.velocity_ms)
+            span.set_attribute("perception_mode",  PERCEPTION_MODE)
 
             t0 = time.perf_counter()
-            if _NATIVE_LIDAR:
-                arr = np.asarray(sensor_input.lidar_distances_m, dtype=np.float64)
-                obstacles, clear_zones = _cy_cluster_lidar(
-                    arr, sensor_input.velocity_ms, DetectedObstacle, ClearZone
-                )
+
+            # ── Route to stereo or LIDAR path ─────────────────────────────────
+            if sensor_input.stereo_input or PERCEPTION_MODE == "stereo":
+                span.set_attribute("input.type", "stereo")
+                result = _analyze_stereo(sensor_input)
+                obstacles   = result.obstacles
+                clear_zones = result.clear_zones
+                e_stop      = result.emergency_stop
+                action      = result.recommended_action
             else:
-                obstacles, clear_zones = _cluster_lidar(
-                    sensor_input.lidar_distances_m,
-                    sensor_input.velocity_ms,
-                )
+                span.set_attribute("lidar.rays",   len(sensor_input.lidar_distances_m))
+                span.set_attribute("input.type",   "lidar")
+                if _NATIVE_LIDAR:
+                    arr = np.asarray(sensor_input.lidar_distances_m, dtype=np.float64)
+                    obstacles, clear_zones = _cy_cluster_lidar(
+                        arr, sensor_input.velocity_ms, DetectedObstacle, ClearZone
+                    )
+                else:
+                    obstacles, clear_zones = _cluster_lidar(
+                        sensor_input.lidar_distances_m,
+                        sensor_input.velocity_ms,
+                    )
+                e_stop = any(o.distance_m < EMERGENCY_DIST_M for o in obstacles)
+                action = _recommend(obstacles, clear_zones)
+
             elapsed = time.perf_counter() - t0
             analysis_latency.observe(elapsed)
-
-            e_stop  = any(o.distance_m < EMERGENCY_DIST_M for o in obstacles)
-            action  = _recommend(obstacles, clear_zones)
-
             frames_processed.inc()
             for o in obstacles:
                 obstacles_found.labels(threat=o.classification).inc()
@@ -220,9 +295,9 @@ class ObstacleDetectorService(ObstacleDetectorBase):
                 emergency_stops.inc()
             clear_zones_gauge.set(len(clear_zones))
 
-            span.set_attribute("obstacles.count",    len(obstacles))
-            span.set_attribute("clear_zones.count",  len(clear_zones))
-            span.set_attribute("emergency_stop",     e_stop)
+            span.set_attribute("obstacles.count",   len(obstacles))
+            span.set_attribute("clear_zones.count", len(clear_zones))
+            span.set_attribute("emergency_stop",    e_stop)
 
             return ObstacleAnalysis(
                 rover_id           = sensor_input.rover_id,

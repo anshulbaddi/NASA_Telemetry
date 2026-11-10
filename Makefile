@@ -1,22 +1,36 @@
 SHELL    := /bin/bash
 REGISTRY ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 TAG      ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
+# Ground-station Docker services (stereo-perception and motor-controller run on Jetson directly)
 SERVICES := producer consumer path-planner obstacle-detector motor-controller api-gateway fdir
 PYTHON   ?= python3
+JETSON   ?= jetson@192.168.1.42   # override: make jetson-run JETSON=jetson@<ip>
 
-.PHONY: all dev dev-down install proto proto-lint docker-build docker-push ecr-login \
+.PHONY: all dev dev-down ground ground-down install install-stereo \
+        proto proto-lint build-ext \
+        test test-stereo \
+        docker-build docker-push ecr-login \
         k8s-apply k8s-rollout-status k8s-delete \
         infra-init infra-plan infra-apply infra-destroy \
-        test lint clean help
+        jetson-install jetson-run jetson-stop jetson-logs \
+        logs port-forward-grafana port-forward-jaeger port-forward-api \
+        clean help
 
 all: docker-build
 
-## ── Local dev ────────────────────────────────────────────────────────────────
+## ── Local dev (full simulation stack) ──────────────────────────────────────
 dev:
 	docker compose up --build
 
 dev-down:
 	docker compose down -v
+
+## ── Ground station (physical rover split deployment) ─────────────────────────
+ground:
+	docker compose -f deployment/docker-compose.ground.yml up --build
+
+ground-down:
+	docker compose -f deployment/docker-compose.ground.yml down -v
 
 ## ── Python deps (host install for local testing) ─────────────────────────────
 install:
@@ -24,6 +38,9 @@ install:
 		echo "==> pip install services/$$svc"; \
 		pip install -q -r services/$$svc/requirements.txt; \
 	done
+
+install-stereo:
+	pip install -q -r services/stereo-perception/requirements.txt
 
 ## ── Proto generation (betterproto) ──────────────────────────────────────────
 proto:
@@ -58,6 +75,11 @@ test:
 	@find k8s monitoring -name '*.yaml' -o -name '*.yml' | \
 		xargs $(PYTHON) -c "import sys,yaml; [yaml.safe_load(open(f)) for f in sys.argv[1:]]" && \
 		echo "  All YAML OK"
+	@$(MAKE) test-stereo
+
+test-stereo:
+	@echo "==> Stereo perception unit tests (no hardware required)"
+	$(PYTHON) -m pytest tests/stereo/ -v --tb=short
 
 ## ── Docker ───────────────────────────────────────────────────────────────────
 docker-build:
@@ -105,6 +127,28 @@ infra-apply:
 
 infra-destroy:
 	cd infrastructure/terraform && terraform destroy
+
+## ── Jetson Nano targets ──────────────────────────────────────────────────────
+# Deploy the repo to the Jetson over SSH and run the install script.
+# Usage: make jetson-install JETSON=jetson@192.168.1.42
+jetson-install:
+	@echo "==> Syncing repo to $(JETSON):/home/jetson/rover"
+	rsync -av --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' \
+	      --exclude='venv' --exclude='data/test_stereo' \
+	      ./ $(JETSON):/home/jetson/rover/
+	ssh -t $(JETSON) "sudo bash /home/jetson/rover/deployment/jetson/install.sh"
+
+jetson-run:
+	@echo "==> Starting rover services on $(JETSON)"
+	ssh $(JETSON) "sudo systemctl start motor-controller stereo-perception"
+
+jetson-stop:
+	@echo "==> Stopping rover services on $(JETSON)"
+	ssh $(JETSON) "sudo systemctl stop stereo-perception motor-controller"
+
+jetson-logs:
+	@echo "==> Streaming stereo-perception logs from $(JETSON)"
+	ssh $(JETSON) "journalctl -fu stereo-perception"
 
 ## ── Observability shortcuts ──────────────────────────────────────────────────
 logs:

@@ -1,29 +1,56 @@
 {
-  "title": "Rover Fleet — Ground Control",
+  "title": "Rover Fleet \u2014 Ground Control",
   "uid": "rover-fleet-main",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "5s",
-  "time": { "from": "now-30m", "to": "now" },
-  "tags": ["rover-fleet", "telemetry", "fdir"],
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "tags": [
+    "rover-fleet",
+    "telemetry",
+    "fdir"
+  ],
   "panels": [
     {
       "id": 1,
       "title": "Kafka Throughput (msg/sec)",
       "type": "stat",
-      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
-      "targets": [{
-        "expr": "sum(rate(kafka_messages_produced_total[1m]))",
-        "legendFormat": "msg/sec"
-      }],
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(kafka_messages_produced_total[1m]))",
+          "legendFormat": "msg/sec"
+        }
+      ],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "background",
         "thresholds": {
           "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 50000 },
-            { "color": "red", "value": 160000 }
+            {
+              "color": "green",
+              "value": null
+            },
+            {
+              "color": "yellow",
+              "value": 50000
+            },
+            {
+              "color": "red",
+              "value": 160000
+            }
           ]
         }
       }
@@ -32,16 +59,32 @@
       "id": 2,
       "title": "Active Rover Count",
       "type": "stat",
-      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
-      "targets": [{
-        "expr": "count(count by (rover_id)(rover_battery_percent))",
-        "legendFormat": "Rovers"
-      }],
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "count(count by (rover_id)(rover_battery_percent))",
+          "legendFormat": "Rovers"
+        }
+      ],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "background",
         "thresholds": {
-          "steps": [{ "color": "blue", "value": null }]
+          "steps": [
+            {
+              "color": "blue",
+              "value": null
+            }
+          ]
         }
       }
     },
@@ -49,19 +92,39 @@
       "id": 3,
       "title": "Active Faults",
       "type": "stat",
-      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
-      "targets": [{
-        "expr": "sum(fdir_active_faults)",
-        "legendFormat": "Active Faults"
-      }],
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(fdir_active_faults)",
+          "legendFormat": "Active Faults"
+        }
+      ],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "background",
         "thresholds": {
           "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 1 },
-            { "color": "red", "value": 5 }
+            {
+              "color": "green",
+              "value": null
+            },
+            {
+              "color": "yellow",
+              "value": 1
+            },
+            {
+              "color": "red",
+              "value": 5
+            }
           ]
         }
       }
@@ -70,20 +133,40 @@
       "id": 4,
       "title": "FDIR Anomaly Detection Latency (p99)",
       "type": "stat",
-      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
-      "targets": [{
-        "expr": "histogram_quantile(0.99, sum(rate(fdir_detection_latency_seconds_bucket[5m])) by (le))",
-        "legendFormat": "p99 latency"
-      }],
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(fdir_detection_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99 latency"
+        }
+      ],
       "options": {
         "unit": "s",
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "background",
         "thresholds": {
           "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 10 },
-            { "color": "red", "value": 30 }
+            {
+              "color": "green",
+              "value": null
+            },
+            {
+              "color": "yellow",
+              "value": 10
+            },
+            {
+              "color": "red",
+              "value": 30
+            }
           ]
         }
       }
@@ -92,7 +175,12 @@
       "id": 5,
       "title": "gRPC Request Latency by Service (p99)",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
       "targets": [
         {
           "expr": "histogram_quantile(0.99, sum(rate(grpc_request_duration_seconds_bucket[1m])) by (method, le))",
@@ -105,39 +193,66 @@
       ],
       "options": {
         "unit": "s",
-        "tooltip": { "mode": "multi" }
+        "tooltip": {
+          "mode": "multi"
+        }
       }
     },
     {
       "id": 6,
       "title": "Kafka Consumer Lag",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
-      "targets": [{
-        "expr": "sum(kafka_consumer_lag) by (topic)",
-        "legendFormat": "{{topic}}"
-      }],
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(kafka_consumer_lag) by (topic)",
+          "legendFormat": "{{topic}}"
+        }
+      ],
       "options": {
         "unit": "short",
-        "tooltip": { "mode": "multi" }
+        "tooltip": {
+          "mode": "multi"
+        }
       }
     },
     {
       "id": 7,
       "title": "Rover Battery Levels",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
-      "targets": [{
-        "expr": "rover_battery_percent",
-        "legendFormat": "{{rover_id}}"
-      }],
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rover_battery_percent",
+          "legendFormat": "{{rover_id}}"
+        }
+      ],
       "options": {
         "unit": "percent",
         "thresholds": {
           "steps": [
-            { "color": "red", "value": null },
-            { "color": "yellow", "value": 20 },
-            { "color": "green", "value": 50 }
+            {
+              "color": "red",
+              "value": null
+            },
+            {
+              "color": "yellow",
+              "value": 20
+            },
+            {
+              "color": "green",
+              "value": 50
+            }
           ]
         }
       }
@@ -146,18 +261,34 @@
       "id": 8,
       "title": "Motor Temperature by Rover",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
-      "targets": [{
-        "expr": "rover_motor_temp_celsius",
-        "legendFormat": "{{rover_id}} {{motor}}"
-      }],
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rover_motor_temp_celsius",
+          "legendFormat": "{{rover_id}} {{motor}}"
+        }
+      ],
       "options": {
         "unit": "celsius",
         "thresholds": {
           "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 80 },
-            { "color": "red", "value": 100 }
+            {
+              "color": "green",
+              "value": null
+            },
+            {
+              "color": "yellow",
+              "value": 80
+            },
+            {
+              "color": "red",
+              "value": 100
+            }
           ]
         }
       }
@@ -166,36 +297,366 @@
       "id": 9,
       "title": "FDIR Anomalies Detected (rate/min)",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
-      "targets": [{
-        "expr": "sum(rate(fdir_anomalies_detected_total[1m])) by (severity) * 60",
-        "legendFormat": "{{severity}}"
-      }],
-      "options": { "unit": "short" }
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(fdir_anomalies_detected_total[1m])) by (severity) * 60",
+          "legendFormat": "{{severity}}"
+        }
+      ],
+      "options": {
+        "unit": "short"
+      }
     },
     {
       "id": 10,
       "title": "Obstacles Detected per Rover",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
-      "targets": [{
-        "expr": "sum(rate(obstacles_detected_total[1m])) by (rover_id, classification) * 60",
-        "legendFormat": "{{rover_id}} {{classification}}"
-      }],
-      "options": { "unit": "short" }
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(obstacles_detected_total[1m])) by (rover_id, classification) * 60",
+          "legendFormat": "{{rover_id}} {{classification}}"
+        }
+      ],
+      "options": {
+        "unit": "short"
+      }
     },
     {
       "id": 11,
       "title": "Telemetry Messages Processed (all services)",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 28, "w": 24, "h": 6 },
-      "targets": [{
-        "expr": "sum(rate(telemetry_messages_total[30s])) by (service) * 30",
-        "legendFormat": "{{service}}"
-      }],
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(telemetry_messages_total[30s])) by (service) * 30",
+          "legendFormat": "{{service}}"
+        }
+      ],
       "options": {
         "unit": "short",
-        "tooltip": { "mode": "multi" }
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "title": "Stereo Perception (Jetson Nano)",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 12,
+      "title": "Stereo Pipeline FPS",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "stereo_camera_fps",
+          "legendFormat": "camera fps"
+        },
+        {
+          "expr": "stereo_processing_fps",
+          "legendFormat": "perception fps"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "Depth Processing Latency (ms)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 8,
+        "y": 35,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "stereo_processing_latency_ms",
+          "legendFormat": "latency ms"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "title": "Valid Depth Fraction",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 16,
+        "y": 35,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "valid_depth_fraction",
+          "legendFormat": "valid fraction"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "title": "Obstacle Clearances (m)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "nearest_obstacle_m",
+          "legendFormat": "nearest (any)"
+        },
+        {
+          "expr": "left_clearance_m",
+          "legendFormat": "left"
+        },
+        {
+          "expr": "center_clearance_m",
+          "legendFormat": "center"
+        },
+        {
+          "expr": "right_clearance_m",
+          "legendFormat": "right"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "lengthm",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "nearest (any)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "title": "Emergency Stops & Camera Failures",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 41,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(emergency_stop_count[1m]) * 60",
+          "legendFormat": "emergency stops/min"
+        },
+        {
+          "expr": "rate(camera_failure_count[1m]) * 60",
+          "legendFormat": "camera failures/min"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "emergency stops/min"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "title": "Jetson CPU & Memory",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 49,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "jetson_cpu_percent",
+          "legendFormat": "CPU %"
+        },
+        {
+          "expr": "jetson_memory_percent",
+          "legendFormat": "Memory %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "title": "Jetson Temperatures (\u00b0C)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 49,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "jetson_cpu_temp_celsius",
+          "legendFormat": "CPU temp"
+        },
+        {
+          "expr": "jetson_gpu_temp_celsius",
+          "legendFormat": "GPU temp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "min": 0,
+          "max": 90
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU temp"
+            },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 70
+                    },
+                    {
+                      "color": "red",
+                      "value": 85
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
       }
     }
   ]

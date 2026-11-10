@@ -8,11 +8,16 @@ import grpclib
 
 @dataclass
 class SensorInput(betterproto.Message):
-    rover_id:          str         = betterproto.string_field(1)
-    timestamp_ms:      int         = betterproto.int64_field(2)
-    lidar_distances_m: List[float] = betterproto.double_field(3)
-    velocity_ms:       float       = betterproto.double_field(4)
-    heading_degrees:   float       = betterproto.double_field(5)
+    rover_id:           str         = betterproto.string_field(1)
+    timestamp_ms:       int         = betterproto.int64_field(2)
+    lidar_distances_m:  List[float] = betterproto.double_field(3)
+    velocity_ms:        float       = betterproto.double_field(4)
+    heading_degrees:    float       = betterproto.double_field(5)
+    # Stereo-derived regional clearances (physical rover)
+    left_clearance_m:   float       = betterproto.double_field(6)
+    center_clearance_m: float       = betterproto.double_field(7)
+    right_clearance_m:  float       = betterproto.double_field(8)
+    stereo_input:       bool        = betterproto.bool_field(9)
 
 
 @dataclass

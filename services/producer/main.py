@@ -1,4 +1,20 @@
-"""Rover fleet telemetry producer — publishes protobuf SensorData to Kafka."""
+"""
+Rover fleet telemetry producer.
+
+TELEMETRY_MODE=simulation (default):
+  Simulates NUM_ROVERS rovers at PUBLISH_RATE_HZ with realistic random faults.
+  Use this for development and ground-station testing without the physical rover.
+
+TELEMETRY_MODE=hardware:
+  Publishes one real telemetry frame for the local Jetson Nano.
+  System metrics (CPU, GPU, temperature) are read from the Jetson sysfs.
+  Perception data (obstacle clearances, depth FPS, etc.) must be provided
+  by the stereo-perception service which writes to HARDWARE_STATE_FILE.
+
+  In practice, the stereo-perception service (services/stereo-perception/main.py)
+  handles Kafka publishing directly in hardware mode; this producer operates as
+  a supplementary system-metrics publisher only.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -29,6 +45,9 @@ NUM_ROVERS         = int(os.getenv("NUM_ROVERS",     "10"))
 PUBLISH_RATE_HZ    = float(os.getenv("PUBLISH_RATE_HZ", "200"))  # per rover
 METRICS_PORT       = int(os.getenv("METRICS_PORT",   "9090"))
 OTLP_ENDPOINT      = os.getenv("OTLP_ENDPOINT",     "http://localhost:4317")
+TELEMETRY_MODE     = os.getenv("TELEMETRY_MODE",    "simulation")  # simulation | hardware
+ROVER_ID           = os.getenv("ROVER_ID",           "PHYSICAL-ROVER-001")
+HARDWARE_RATE_HZ   = float(os.getenv("HARDWARE_RATE_HZ", "2.0"))  # hz for hardware mode
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -216,27 +235,101 @@ async def flush_loop(producer: Producer) -> None:
         producer.flush(timeout=2.0)
 
 
+async def run_hardware_rover(producer: Producer, tracer: trace.Tracer) -> None:
+    """
+    Hardware telemetry loop: publish real Jetson system metrics.
+
+    The stereo-perception service also publishes to Kafka directly; this
+    function publishes lightweight system-only frames as a heartbeat and
+    for ground-station monitoring when stereo-perception is not running.
+    """
+    try:
+        import psutil
+        _psutil = True
+    except ImportError:
+        _psutil = False
+
+    def _read_sysfs_temp(zone_names: List[str]) -> float:
+        base = "/sys/class/thermal"
+        if not os.path.exists(base):
+            return 0.0
+        for zone in os.listdir(base):
+            tp = os.path.join(base, zone, "type")
+            vp = os.path.join(base, zone, "temp")
+            try:
+                if open(tp).read().strip() in zone_names:
+                    return float(open(vp).read().strip()) / 1000.0
+            except (OSError, ValueError):
+                pass
+        return 0.0
+
+    seq = 0
+    interval = 1.0 / HARDWARE_RATE_HZ
+    log.info("Hardware producer: rover_id=%s @ %.1f Hz → %s/%s",
+             ROVER_ID, HARDWARE_RATE_HZ, KAFKA_BROKERS, KAFKA_TOPIC)
+
+    while True:
+        cpu_temp  = _read_sysfs_temp(["CPU-therm", "CPU", "cpu-thermal"])
+        cpu_pct   = psutil.cpu_percent(interval=None) if _psutil else 0.0
+        mem_pct   = psutil.virtual_memory().percent   if _psutil else 0.0
+
+        frame = SensorData(
+            rover_id             = ROVER_ID,
+            timestamp_ms         = int(time.time() * 1000),
+            cpu_temp_celsius     = cpu_temp,
+            memory_usage_percent = mem_pct,
+            status               = RoverStatus.ROVER_STATUS_NOMINAL,
+            sequence_number      = seq,
+        )
+        seq += 1
+        payload = bytes(frame)
+
+        with tracer.start_as_current_span("rover.publish.hardware") as span:
+            span.set_attribute("rover.id",  ROVER_ID)
+            span.set_attribute("mode",      "hardware")
+            t_produce = asyncio.get_event_loop().time()
+            producer.produce(
+                topic    = KAFKA_TOPIC,
+                key      = ROVER_ID.encode(),
+                value    = payload,
+                on_delivery = lambda err, msg: (
+                    messages_published.labels(rover_id=ROVER_ID).inc() if not err
+                    else publish_errors.labels(rover_id=ROVER_ID).inc()
+                ),
+            )
+            publish_latency.observe(asyncio.get_event_loop().time() - t_produce)
+
+        producer.poll(0)
+        await asyncio.sleep(interval)
+
+
 async def main() -> None:
     start_http_server(METRICS_PORT)
     tracer   = setup_otel()
     producer = make_kafka_producer()
 
-    rovers = [
-        RoverState(
-            rover_id  = f"ROVER-{i:03d}",
-            latitude  = 18.5 + random.uniform(-0.5, 0.5),
-            longitude = 77.5 + random.uniform(-0.5, 0.5),
-            altitude_m = random.uniform(80, 120),
-            _phase    = random.uniform(0, 2 * math.pi),
-        )
-        for i in range(NUM_ROVERS)
-    ]
-
-    log.info("Starting producer: %d rovers @ %.0f Hz → %s/%s",
-             NUM_ROVERS, PUBLISH_RATE_HZ, KAFKA_BROKERS, KAFKA_TOPIC)
-
-    tasks = [asyncio.create_task(run_rover(r, producer, tracer)) for r in rovers]
-    tasks.append(asyncio.create_task(flush_loop(producer)))
+    if TELEMETRY_MODE == "hardware":
+        log.info("TELEMETRY_MODE=hardware: publishing real Jetson system metrics")
+        log.info("Note: stereo-perception service also publishes perception data independently")
+        tasks = [
+            asyncio.create_task(run_hardware_rover(producer, tracer)),
+            asyncio.create_task(flush_loop(producer)),
+        ]
+    else:
+        rovers = [
+            RoverState(
+                rover_id  = f"ROVER-{i:03d}",
+                latitude  = 18.5 + random.uniform(-0.5, 0.5),
+                longitude = 77.5 + random.uniform(-0.5, 0.5),
+                altitude_m = random.uniform(80, 120),
+                _phase    = random.uniform(0, 2 * math.pi),
+            )
+            for i in range(NUM_ROVERS)
+        ]
+        log.info("Starting producer: %d rovers @ %.0f Hz → %s/%s",
+                 NUM_ROVERS, PUBLISH_RATE_HZ, KAFKA_BROKERS, KAFKA_TOPIC)
+        tasks = [asyncio.create_task(run_rover(r, producer, tracer)) for r in rovers]
+        tasks.append(asyncio.create_task(flush_loop(producer)))
 
     try:
         await asyncio.gather(*tasks)

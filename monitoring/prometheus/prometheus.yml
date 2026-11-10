@@ -68,6 +68,27 @@ scrape_configs:
   #       regex: (.+)
   #       replacement: $1:${__meta_kubernetes_pod_annotation_prometheus_io_port}
 
+  # ── Jetson Nano (physical rover) ────────────────────────────────────────────
+  # stereo-perception exposes Prometheus on port 9095.
+  # In deployment/docker-compose.ground.yml, Prometheus gets an extra_hosts
+  # entry mapping "jetson" → ${JETSON_IP}, so this hostname resolves automatically.
+  # For the full docker-compose.yml (dev), replace "jetson" with the Jetson's IP.
+  - job_name: stereo-perception
+    static_configs:
+      - targets: ["jetson:9095"]
+        labels:
+          instance: jetson-nano
+    metrics_path: /metrics
+    scrape_interval: 5s
+
+  - job_name: motor-controller-jetson
+    static_configs:
+      - targets: ["jetson:9094"]
+        labels:
+          instance: jetson-nano
+    metrics_path: /metrics
+    scrape_interval: 10s
+
   # ── Self-monitoring ─────────────────────────────────────────────────────────
   - job_name: prometheus
     static_configs:
